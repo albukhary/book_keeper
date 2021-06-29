@@ -45,6 +45,7 @@ type Book struct {
 }
 
 func main() {
+
 	//Loading environment variables for DATABASE connection
 	dialect := os.Getenv("DIALECT")
 	host := os.Getenv("HOST")

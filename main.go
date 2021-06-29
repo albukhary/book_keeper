@@ -1,12 +1,26 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 
+	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/postgres"
+)
+
+var (
+	person = &Person{
+		Name: "Jack", Email: "jack@email.com",
+	}
+	books = []Book{
+		{Title: "The Rules fo Thinking", Author: "Richard Templer", CallNumber: 1234, PersonID: 1},
+		{Title: "Book 2", Author: "Author 2", CallNumber: 2345, PersonID: 1},
+		{Title: "Book 3", Author: "Author 3", CallNumber: 3456, PersonID: 1},
+	}
 )
 
 var db *gorm.DB
@@ -56,5 +70,69 @@ func main() {
 	// Make migration to the database if they have not been already created
 	db.AutoMigrate(&Person{})
 	db.AutoMigrate(&Book{})
+
+	// API routes
+	router := mux.NewRouter()
+
+	router.HandleFunc("/people", getPeople).Methods("GET")
+	router.HandleFunc("/person/{id}", getPerson).Methods("GET") // get a person and all his books
+
+	router.HandleFunc("/create/person", createPerson).Methods("POST")
+
+	router.HandleFunc("/delete/person/{id}", deletePerson).Methods("DELETE")
+
+	http.ListenAndServe(":8080", router)
+}
+
+//APIControllers
+func getPeople(w http.ResponseWriter, r *http.Request) {
+	var people []Person
+
+	db.Find(&people)
+
+	json.NewEncoder(w).Encode(&people)
+}
+
+func getPerson(w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+
+	var person Person
+	var books []Book
+
+	// find the first match from database
+	db.First(&person, params["id"])
+	db.Model(&person).Related(&books)
+
+	person.Books = books
+
+	json.NewEncoder(w).Encode(person)
+}
+
+// Somebody will send person data as JSON
+// and we will put it into person struct and then into database
+func createPerson(w http.ResponseWriter, r *http.Request) {
+	var person Person
+	json.NewDecoder(r.Body).Decode(&person)
+
+	createdPerson := db.Create(&person)
+	err = createdPerson.Error
+	if err != nil {
+		// send the error to the URL endpoint instead of created person in case of error
+		json.NewEncoder(w).Encode(err)
+	} else {
+		json.NewEncoder(w).Encode(&person)
+	}
+
+}
+
+func deletePerson(w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+
+	var person Person
+
+	db.First(&person, params["id"])
+	db.Delete(&person)
+
+	json.NewEncoder(w).Encode(&person)
 
 }

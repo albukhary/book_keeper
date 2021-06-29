@@ -76,15 +76,21 @@ func main() {
 
 	router.HandleFunc("/people", getPeople).Methods("GET")
 	router.HandleFunc("/person/{id}", getPerson).Methods("GET") // get a person and all his books
+	router.HandleFunc("/books", getBooks).Methods("GET")        // read all books from databse
+	router.HandleFunc("/book/{id}", getBook).Methods("GET")
 
 	router.HandleFunc("/create/person", createPerson).Methods("POST")
+	router.HandleFunc("/create/book", createBook).Methods("POST")
 
 	router.HandleFunc("/delete/person/{id}", deletePerson).Methods("DELETE")
+	router.HandleFunc("/delete/book/{id}", deleteBook).Methods("DELETE")
 
-	http.ListenAndServe(":8080", router)
+	log.Fatal(http.ListenAndServe(":8080", router))
 }
 
-//APIControllers
+// API Controllers
+
+// controller of Persons
 func getPeople(w http.ResponseWriter, r *http.Request) {
 	var people []Person
 
@@ -122,7 +128,6 @@ func createPerson(w http.ResponseWriter, r *http.Request) {
 	} else {
 		json.NewEncoder(w).Encode(&person)
 	}
-
 }
 
 func deletePerson(w http.ResponseWriter, r *http.Request) {
@@ -134,5 +139,50 @@ func deletePerson(w http.ResponseWriter, r *http.Request) {
 	db.Delete(&person)
 
 	json.NewEncoder(w).Encode(&person)
+}
 
+// Book Controllers
+
+func getBooks(w http.ResponseWriter, r *http.Request) {
+	var books []Book
+
+	db.Find(&books)
+
+	json.NewEncoder(w).Encode(&books)
+}
+
+func getBook(w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r) //grab the ID of the book fromt he URL as JSON(i think)
+
+	var book Book
+
+	db.First(&book, params["id"])
+
+	json.NewEncoder(w).Encode(&book)
+
+}
+
+func createBook(w http.ResponseWriter, r *http.Request) {
+	var book Book
+	json.NewDecoder(r.Body).Decode(&book)
+
+	createdBook := db.Create(&book)
+	err = createdBook.Error
+	if err != nil {
+		// send the error to the URL endpoint instead of created book in case of error
+		json.NewEncoder(w).Encode(err)
+	} else {
+		json.NewEncoder(w).Encode(&book)
+	}
+}
+
+func deleteBook(w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+
+	var book Book
+
+	db.First(&book, params["id"])
+	db.Delete(&book)
+
+	json.NewEncoder(w).Encode(&book)
 }
